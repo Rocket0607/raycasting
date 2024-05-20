@@ -342,10 +342,6 @@ std::vector<struct Line> get_lines(double posX, double posY, double dirX, double
     }
 
     // calculate y or x movement
-    double movementY = rayDirY / rayDirX;
-    double movementX = rayDirX / rayDirY;
-    double totalMovementY = 0;
-    double totalMovementX = 0;
     double hit_position;
 
     hit = 0;
@@ -358,22 +354,20 @@ std::vector<struct Line> get_lines(double posX, double posY, double dirX, double
       if (sideDistX < sideDistY) {
         sideDistX += deltaDistX;
         mapX += stepX;
-        totalMovementY += movementY;
         side = 0;
       } else {
         sideDistY += deltaDistY;
         mapY += stepY;
-        totalMovementX += movementX;
         side = 1;
       }
       if (worldMap[mapX][mapY] > 0) hit = 1;
     }
     if(side == 0) {
       perpWallDist = (sideDistX - deltaDistX);
-      hit_position = totalMovementY - floor(totalMovementY);
+      hit_position = posY + rayDirY * perpWallDist;
     } else {
       perpWallDist = (sideDistY - deltaDistY);
-      hit_position = totalMovementX - floor(totalMovementX);
+      hit_position = posX + rayDirX * perpWallDist;
     }
 
     lineHeight = (int)(screenHeight / perpWallDist);
