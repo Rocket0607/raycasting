@@ -60,7 +60,7 @@ double pY = 12.0;
 double dX = -1.0, dY = 0.0;
 double planeX = 0.0, planeY = 0.66;
 double speed = 0.005;
-double theta = PI/365.0;
+double theta = PI / (180.0 * 4);
 
 int main()
 {
@@ -75,7 +75,7 @@ int main()
     #endif
 
     // glfw window creation
-    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Collision Simulation", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Raycasting", NULL, NULL);
     if (window == NULL) {
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
@@ -99,12 +99,14 @@ int main()
     };
     const char *vertexShaderSource = "#version 330 core\n"
         "layout (location = 0) in vec3 aPos;\n"
-        "uniform mat4 MVP;\n"
+        "uniform mat4 model;\n"
+        "uniform mat4 view;\n"
+        "uniform mat4 projection;\n"
         "out float yPos;\n"
         "void main()\n"
         "{\n"
         "   yPos = aPos.y;\n"
-        "   gl_Position = MVP * vec4(aPos, 1.0);\n"
+        "   gl_Position = model * view * projection * vec4(aPos, 1.0);\n"
         "}\0";
     const char *fragmentShaderSource = "#version 330 core\n"
         "out vec4 FragColor;\n"
@@ -115,6 +117,7 @@ int main()
         "void main()\n"
         "{\n"
         "   FragColor = texture(ourTexture, vec2(texCoord, yPos)) * vec4(color, 1.0);\n"
+        // "   FragColor = vec4(color, 1.0);"
         "}\n\0";
 
     // vertex shader
@@ -158,7 +161,7 @@ int main()
     // set the texture wrapping/filtering options (on the currently bound texture object)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
     int width, height, nrChannels;
@@ -181,7 +184,6 @@ int main()
 
 
     while (!glfwWindowShouldClose(window)) {
-        // std::vector<Line> lines;
         GLfloat curr_frame = glfwGetTime();
         delta_time = curr_frame - last_frame;
         last_frame = curr_frame;
@@ -193,12 +195,17 @@ int main()
         std::vector<struct Line> lines = get_lines(pX, pY, dX, dY);
 
         for (struct Line line : lines) {
-            glm::mat4 MVP = glm::mat4(1.0f);
-            MVP = glm::scale(MVP, glm::vec3(1.0f, (line.height/(float)screenHeight), 1.0f));
-            MVP = glm::translate(MVP, glm::vec3(2*line.x/(float)screenWidth-1, 0.0f, 0.0f));
+            glm::mat4 model = glm::mat4(1.0f);
+            model = glm::scale(model, glm::vec3(1.0f, (line.height/(float)screenHeight), 1.0f));
+            model = glm::translate(model, glm::vec3(2*line.x/(float)screenWidth-1, 0.0f, 0.0f));
+            glm::mat4 view = glm::mat4(1.0f);
+            // glm::mat4 projection = glm::ortho(0.0f, 641.0f, 0.0f, 481.0f, 0.1f, 100.0f);
+            glm::mat4 projection = glm::mat4(1.0f);
             color = (line.side == 0) ? glm::vec3(1, 1, 1) : glm::vec3(0.8, 0.8, 0.8);
             glUseProgram(shaderProgram);
-            glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "MVP"), 1, GL_FALSE, &MVP[0][0]);
+            glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, &model[0][0]);
+            glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "view"), 1, GL_FALSE, &view[0][0]);
+            glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1, GL_FALSE, &projection[0][0]);
             glUniform3fv(glGetUniformLocation(shaderProgram, "color"), 1, &color[0]);
             glUniform1f(glGetUniformLocation(shaderProgram, "texCoord"), line.hit_position);
             glActiveTexture(GL_TEXTURE0);
@@ -320,8 +327,8 @@ std::vector<struct Line> get_lines(double posX, double posY, double dirX, double
     rayDirX = dirX + planeX * cameraX;
     rayDirY = dirY + planeY * cameraX;
 
-    deltaDistX = sqrt(1 + (rayDirY * rayDirY) / (rayDirX * rayDirX));
-    deltaDistY = sqrt(1 + (rayDirX * rayDirX) / (rayDirY * rayDirY));
+    deltaDistX = std::abs(1 / rayDirX);
+    deltaDistY = std::abs(1 / rayDirY);
 
     mapX = (int)posX;
     mapY = (int)posY;
@@ -333,7 +340,8 @@ std::vector<struct Line> get_lines(double posX, double posY, double dirX, double
     } else {
       stepX = 1;
       sideDistX = (mapX + 1.0 - posX) * deltaDistX;
-    } if (rayDirY < 0) {
+    } 
+    if (rayDirY < 0) {
       stepY = -1;
       sideDistY = (posY - mapY) * deltaDistY;
     } else {
